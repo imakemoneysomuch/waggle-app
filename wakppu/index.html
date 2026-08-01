@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>왁뿌볼 부수기</title>
+<meta name="theme-color" content="#0d0703" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" type="image/png" href="./icon-192.png" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="왁뿌볼" />
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    height:100%; overflow:hidden; overscroll-behavior:none; touch-action:none;
+    background:#07050a; color:#f4ece2;
+    font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+    -webkit-user-select:none; user-select:none;
+  }
+  #cv{ position:fixed; inset:0; width:100%; height:100%; display:block; }
+
+  /* ── 상단 HUD ───────────────────────────────── */
+  #hud{
+    position:fixed; left:0; right:0; top:0; z-index:2; pointer-events:none;
+    padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 0;
+  }
+  .row{ display:flex; align-items:center; gap:10px; }
+  #matName{ font-size:15px; font-weight:800; letter-spacing:-.02em; }
+  #stage{ font-size:12px; opacity:.6; font-weight:600; }
+  #stats{ margin-left:auto; font-size:12px; opacity:.65; text-align:right; line-height:1.45; font-variant-numeric:tabular-nums; }
+  #barWrap{
+    margin-top:8px; height:6px; border-radius:99px; overflow:hidden;
+    background:rgba(255,255,255,.10);
+  }
+  #bar{ height:100%; width:100%; border-radius:99px; transition:background .25s; }
+  #probe{
+    margin-top:7px; font-size:11px; opacity:.42; font-variant-numeric:tabular-nums;
+    letter-spacing:-.01em; min-height:14px;
+  }
+
+  /* ── 중앙 안내 ───────────────────────────────── */
+  #hint{
+    position:fixed; left:0; right:0; top:50%; z-index:2; text-align:center;
+    transform:translateY(-50%); pointer-events:none;
+    font-size:13px; opacity:0; transition:opacity .4s; font-weight:600; letter-spacing:-.01em;
+  }
+  #hint.show{ opacity:.5; }
+  #burst{
+    position:fixed; left:0; right:0; top:38%; z-index:2; text-align:center; pointer-events:none;
+    font-size:30px; font-weight:900; letter-spacing:-.04em; opacity:0;
+    transform:scale(.8); transition:opacity .18s, transform .18s;
+  }
+  #burst.show{ opacity:1; transform:scale(1); }
+  #burst small{ display:block; font-size:13px; font-weight:700; opacity:.6; margin-top:6px; letter-spacing:0; }
+
+  /* ── 하단 조작부(한 손 엄지 영역) ─────────────── */
+  #dock{
+    position:fixed; left:0; right:0; bottom:0; z-index:3;
+    padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 14px);
+    display:flex; flex-direction:column; gap:10px;
+    background:linear-gradient(to top, rgba(6,4,9,.92) 40%, rgba(6,4,9,0));
+  }
+  #mats{ display:flex; gap:8px; }
+  .mat{
+    flex:1; padding:13px 6px 11px; border-radius:16px; border:1.5px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.045); color:#f4ece2; font-family:inherit;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    transition:border-color .18s, background .18s, transform .1s;
+  }
+  .mat:active{ transform:scale(.96); }
+  .mat .e{ font-size:19px; line-height:1; }
+  .mat .n{ font-size:13px; font-weight:800; letter-spacing:-.02em; }
+  .mat .d{ font-size:10px; opacity:.45; font-weight:600; }
+  .mat.on{ background:rgba(255,255,255,.10); }
+  #tools{ display:flex; gap:8px; }
+  .tool{
+    flex:1; padding:10px 4px; border-radius:13px; border:1.5px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.045); color:#f4ece2; font-family:inherit;
+    font-size:12px; font-weight:700; letter-spacing:-.02em; transition:opacity .18s, transform .1s;
+  }
+  .tool:active{ transform:scale(.96); }
+  .tool.off{ opacity:.32; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <div class="row">
+    <span id="matName">크런치</span>
+    <span id="stage">멀쩡함</span>
+    <span id="stats"></span>
+  </div>
+  <div id="barWrap"><div id="bar"></div></div>
+  <div id="probe"></div>
+</div>
+
+<div id="hint">화면을 꾹 눌러서 부숴보세요</div>
+<div id="burst"></div>
+
+<div id="dock">
+  <div id="mats">
+    <button class="mat" data-m="dough"><span class="e">🫓</span><span class="n">반죽</span><span class="d">쭈욱 늘어남</span></button>
+    <button class="mat" data-m="crunch"><span class="e">🍪</span><span class="n">크런치</span><span class="d">쩍 갈라짐</span></button>
+    <button class="mat" data-m="slush"><span class="e">🧊</span><span class="n">슬러시</span><span class="d">사각 뭉개짐</span></button>
+  </div>
+  <div id="tools">
+    <button class="tool" id="tVib">📳 진동</button>
+    <button class="tool" id="tSnd">🔊 소리</button>
+    <button class="tool" id="tNew">↻ 새 볼</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════
+   왁뿌볼 부수기 — 한 손 터치로 부수는 촉감 시뮬레이터
+   · 접촉 면적(터치 반경) × 누른 시간 → 부서지는 정도가 달라진다
+   · 물리: 압력(면적 보존) + 이웃 스프링 + 형태 기억 을 가진 소프트바디 링
+   · 소리: 전부 WebAudio 합성(외부 파일 없음), 재질별 음색
+   · 진동: Vibration API — 재질별 펄스 길이/간격으로 질감을 흉내
+   ══════════════════════════════════════════════════════════════ */
+
+const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const rnd   = (a,b)=> a+Math.random()*(b-a);
+const TAU   = Math.PI*2;
+
+/* ── 재질 정의 ────────────────────────────────────────────────
+   ke     이웃 스프링 강성      kshape 원래 모양으로 돌아가려는 힘
+   press  내부 압력(빵빵함)     plastic 눌린 모양이 굳는 속도(소성)
+   spread 누르면 옆으로 퍼지는 정도    hardness 손상 속도
+   trig   손상이 시작되는 최소 압력    accel  손상이 손상을 부르는 정도
+*/
+const MATS = {
+  dough: {
+    key:'dough', label:'반죽', emoji:'🫓',
+    ke:430, kd:11, kshape:38, damp:4.2, press:1500, grav:820, push:1500,
+    spread:0.42, plastic:1.5, hardness:0.72, trig:0.10, accel:0.55, diffuse:0.5,
+    rubDmg:0.55, shrink:0.22, crackW:9, crackKind:'tear',
+    bounce:0.05, hapt:{min:7,max:18,gap:100,jit:0.6},
+    col:{ a:'#f8e6c6', b:'#e6c795', c:'#bb9159', crack:'#8a6134',
+          spark:'#fff6e6', bg:['#241b12','#0b0806'], accent:'#e6c795' },
+    stages:['말랑함','손자국','늘어짐','찢어지기 직전'],
+    pop:'뭉개짐!'
+  },
+  crunch: {
+    key:'crunch', label:'크런치', emoji:'🍪',
+    ke:2100, kd:26, kshape:340, damp:6.5, press:4200, grav:900, push:2600,
+    spread:0.10, plastic:0.10, hardness:0.60, trig:0.34, accel:2.6, diffuse:1.15,
+    rubDmg:0.10, shrink:0.34, crackW:3, crackKind:'crack',
+    bounce:0.28, hapt:{min:4,max:13,gap:46,jit:1.3},
+    col:{ a:'#f9d197', b:'#dd9a45', c:'#a25c17', crack:'#3a1c04',
+          spark:'#ffeac6', bg:['#251709','#0b0603'], accent:'#dd9a45' },
+    stages:['멀쩡함','실금','쩍 갈라짐','산산조각 직전'],
+    pop:'박살!'
+  },
+  slush: {
+    key:'slush', label:'슬러시', emoji:'🧊',
+    ke:300, kd:16, kshape:22, damp:5.5, press:820, grav:1250, push:900,
+    spread:0.95, plastic:3.2, hardness:1.05, trig:0.05, accel:1.7, diffuse:1.35,
+    rubDmg:0.85, shrink:0.42, crackW:6, crackKind:'melt',
+    bounce:0.02, hapt:{min:3,max:8,gap:27,jit:0.9},
+    col:{ a:'#dff4ff', b:'#8fd0f2', c:'#3f8fc4', crack:'#1b5478',
+          spark:'#ffffff', bg:['#0c1a26','#03070d'], accent:'#8fd0f2' },
+    stages:['사각함','녹기 시작','질척임','다 뭉개짐'],
+    pop:'철퍽!'
+  }
+};
+
+/* ══════════════ 소리 — WebAudio 합성 ══════════════ */
+const Sfx = {
+  ctx:null, master:null, noise:null, on:true, ready:false,
+  init(){
+    if(this.ctx) return;
+    const C = window.AudioContext||window.webkitAudioContext;
+    if(!C) return;
+    try{
+      this.ctx = new C();
+      const comp = this.ctx.createDynamicsCompressor();
+      comp.threshold.value=-14; comp.knee.value=22; comp.ratio.value=9;
+      comp.attack.value=0.002; comp.release.value=0.18;
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.85;
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      const len = Math.floor(this.ctx.sampleRate*2);
+      const buf = this.ctx.createBuffer(1,len,this.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+      this.noise = buf;
+      this.ready = true;
+    }catch(e){ this.ready=false; }
+  },
+  resume(){ if(this.ctx && this.ctx.state!=='running') this.ctx.resume().catch(()=>{}); },
+  live(){ return this.on && this.ready && this.ctx && this.ctx.state==='running'; },
+  n(rate){ const s=this.ctx.createBufferSource(); s.buffer=this.noise; s.loop=true;
+           s.playbackRate.value = rate||(0.75+Math.random()*0.6);
+           s.detune.value = rnd(-300,300); return s; },
+  // 어택/디케이 봉투. src를 물려서 리턴된 게인을 master로 보낸다
+  env(t0, atk, dec, peak){
+    const g=this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001,t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004,peak), t0+atk);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+atk+dec);
+    g.connect(this.master); return g;
+  },
+  bq(type,freq,q){ const f=this.ctx.createBiquadFilter(); f.type=type; f.frequency.value=freq; if(q) f.Q.value=q; return f; },
+
+  /* 반죽 — 젖은 반죽이 뭉개지는 "철퍽/쭈욱" */
+  dough(k, wet){
+    if(!this.live()) return; const t=this.ctx.currentTime, i=clamp(k,0,1.4);
+    const s=this.n(0.5+Math.random()*0.4);
+    const bp=this.bq('bandpass', 240+rnd(0,160), 3.2);
+    const f1 = bp.frequency.value*(1.5+1.3*i);
+    bp.frequency.exponentialRampToValueAtTime(f1, t+0.14);
+    const lp=this.bq('lowpass', 1500);
+    const g=this.env(t, 0.018, 0.16+0.10*i, 0.10+0.26*i);
+    s.connect(bp); bp.connect(lp); lp.connect(g);
+    s.start(t); s.stop(t+0.42);
+    const o=this.ctx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(126+rnd(-16,16), t);
+    o.frequency.exponentialRampToValueAtTime(58, t+0.16);
+    const og=this.env(t, 0.010, 0.17, 0.08+0.20*i);
+    o.connect(og); o.start(t); o.stop(t+0.36);
+    if(wet){ // 끈적한 잔향 한 겹
+      const s2=this.n(1.4), bp2=this.bq('bandpass', rnd(900,1700), 6);
+      const g2=this.env(t+0.02, 0.03, 0.13, 0.05+0.09*i);
+      s2.connect(bp2); bp2.connect(g2); s2.start(t+0.02); s2.stop(t+0.3);
+    }
+  },
+
+  /* 크런치 — 마른 껍질이 쩍 갈라지고 부스러지는 소리 */
+  crunch(k, big){
+    if(!this.live()) return; const t=this.ctx.currentTime, i=clamp(k,0,1.4);
+    const grains = 3 + Math.round(11*i) + (big?7:0);
+    for(let m=0;m<grains;m++){
+      const tt = t + Math.random()*(big?0.16:0.075);
+      const s=this.n(0.9+Math.random()*1.1);
+      const hp=this.bq('highpass', rnd(1100,3200));
+      const pk=this.bq('peaking', rnd(2200,6200), 1.6); pk.gain.value=rnd(4,12);
+      const g=this.env(tt, 0.0015, 0.015+Math.random()*0.055, (0.07+0.20*i)*rnd(0.35,1.1));
+      s.connect(hp); hp.connect(pk); pk.connect(g);
+      s.start(tt); s.stop(tt+0.11);
+    }
+    // 쩍 하는 트랜지언트
+    const o=this.ctx.createOscillator(); o.type='triangle';
+    o.frequency.setValueAtTime(rnd(420,700), t);
+    o.frequency.exponentialRampToValueAtTime(rnd(70,110), t+0.075);
+    const og=this.env(t, 0.002, 0.075, (big?0.30:0.14)*(0.5+i));
+    o.connect(og); o.start(t); o.stop(t+0.2);
+    if(big){ // 속 빈 울림
+      const s3=this.n(0.35), lp=this.bq('lowpass', 420);
+      const g3=this.env(t, 0.006, 0.26, 0.22);
+      s3.connect(lp); lp.connect(g3); s3.start(t); s3.stop(t+0.4);
+    }
+  },
+
+  /* 슬러시 — 얼음 알갱이가 사각사각 뭉개지는 소리 */
+  slush(k, big){
+    if(!this.live()) return; const t=this.ctx.currentTime, i=clamp(k,0,1.4);
+    const grains = 2 + Math.round(4*i) + (big?16:0);
+    for(let m=0;m<grains;m++){
+      const tt = t + Math.random()*(big?0.28:0.04);
+      const s=this.n(1.1+Math.random()*1.3);
+      const bp=this.bq('bandpass', rnd(2200,6400), 2.2);
+      const g=this.env(tt, 0.0018, 0.010+Math.random()*0.035, (0.05+0.13*i)*rnd(0.4,1.2));
+      s.connect(bp); bp.connect(g); s.start(tt); s.stop(tt+0.07);
+    }
+    // 물기 있는 저역 한 겹
+    const s2=this.n(0.45), lp=this.bq('lowpass', 520+300*i);
+    const g2=this.env(t, 0.02, big?0.34:0.10, (big?0.24:0.07)+0.08*i);
+    s2.connect(lp); lp.connect(g2); s2.start(t); s2.stop(t+(big?0.5:0.2));
+  },
+
+  hit(mat, k, big){
+    if(mat==='dough') this.dough(k, big);
+    else if(mat==='crunch') this.crunch(k, big);
+    else this.slush(k, big);
+  }
+};
+
+/* ══════════════ 진동 — Vibration API ══════════════ */
+const Hap = {
+  on:true, ok:(typeof navigator!=='undefined' && 'vibrate' in navigator), nextAt:0,
+  buzz(ms){ if(!this.on||!this.ok) return; try{ navigator.vibrate(Math.max(1,Math.round(ms))); }catch(e){} },
+  pat(arr){ if(!this.on||!this.ok) return; try{ navigator.vibrate(arr); }catch(e){} },
+  stop(){ if(!this.ok) return; try{ navigator.vibrate(0); }catch(e){} },
+  /* 누르는 동안의 지속 진동: 재질 프로필대로 짧은 펄스를 촘촘히 재발사한다.
+     Vibration API는 세기 조절이 안 되므로 "길이 + 간격"으로 세기를 흉내낸다. */
+  sustain(now, k, mat){
+    if(k<=0.03 || now<this.nextAt) return;
+    const h=mat.hapt;
+    const dur = h.min + (h.max-h.min)*clamp(k,0,1);
+    const gap = h.gap * (1 - 0.5*clamp(k,0,1)) * (0.75 + Math.random()*h.jit);
+    this.buzz(dur);
+    this.nextAt = now + (dur+gap)/1000;
+  },
+  event(kind, mat){
+    if(!this.on||!this.ok) return;
+    if(kind==='crack'){
+      if(mat==='crunch') this.pat([0,13,16,8]);
+      else if(mat==='slush') this.pat([0,7,12,5,10,4]);
+      else this.pat([0,18,26,12]);
+    } else if(kind==='break'){
+      if(mat==='crunch') this.pat([0,16,22,10,16,8,30,26]);
+      else if(mat==='slush') this.pat([0,8,14,6,12,5,10,4,9,3,26,18]);
+      else this.pat([0,34,52,26,40,60]);
+    }
+    this.nextAt = 0;
+  }
+};
+
+/* ══════════════ 캔버스 ══════════════ */
+const cv = document.getElementById('cv');
+const cx2 = cv.getContext('2d');
+let W=0, H=0, DPR=1, FLOOR=0;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2.5);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  cx2.setTransform(DPR,0,0,DPR,0,0);
+  FLOOR = H*0.72;
+}
+window.addEventListener('resize', ()=>{ resize(); if(S.ball) S.ball.R0 = baseR(); });
+function baseR(){ return Math.min(W,H*0.72)*0.26; }
+
+/* ══════════════ 상태 ══════════════ */
+const N = 60;                       // 링 정점 수
+const S = {
+  mat: localStorage.getItem('wk.mat') || 'crunch',
+  ball:null, pieces:[], parts:[], touches:new Map(),
+  broken:0, phase:'alive', tBreak:0, tSpawn:0, tFirst:0,
+  best: JSON.parse(localStorage.getItem('wk.best')||'{}'),
+  last:0, lastCrack:0, shake:0, flash:0
+};
+Sfx.on = localStorage.getItem('wk.snd') !== '0';
+Hap.on = localStorage.getItem('wk.vib') !== '0';
+
+function spawnBall(){
+  const R = baseR();
+  const cxp = W/2, cyp = FLOOR - R*0.98;
+  const b = { p:[], rest:[], L0:[], dmg:[], cx:cxp, cy:cyp, R0:R,
+              A0:0, spread:1, plast:0, scale:1, cracks:[], ct:new Float32Array(N), wob:Math.random()*TAU };
+  for(let i=0;i<N;i++){
+    const a = i/N*TAU;
+    // 아주 살짝 울퉁불퉁하게 — 완벽한 원보다 손맛이 산다
+    const rr = R*(1 + 0.018*Math.sin(a*3+b.wob) + 0.012*Math.sin(a*7-b.wob));
+    const ox = Math.cos(a)*rr, oy = Math.sin(a)*rr*0.97;
+    b.rest.push({x:ox,y:oy});
+    b.p.push({x:cxp+ox, y:cyp+oy, vx:0, vy:0});
+    b.dmg.push(0);
+  }
+  for(let i=0;i<N;i++){
+    const j=(i+1)%N;
+    b.L0.push(Math.hypot(b.rest[j].x-b.rest[i].x, b.rest[j].y-b.rest[i].y));
+  }
+  b.A0 = polyArea(b.p);
+  S.ball = b; S.phase='alive'; S.tSpawn=performance.now()/1000;
+  // 손가락을 안 뗀 채 다음 볼이 나오면 기록 시계는 지금부터 다시 센다
+  S.tFirst = S.touches.size ? S.tSpawn : 0;
+}
+function polyArea(p){
+  let a=0;
+  for(let i=0;i<p.length;i++){ const j=(i+1)%p.length; a += p[i].x*p[j].y - p[j].x*p[i].y; }
+  return Math.abs(a)/2;
+}
+function integrity(){
+  const b=S.ball; if(!b) return 0;
+  let s=0; for(let i=0;i<N;i++) s+=b.dmg[i];
+  return clamp(1 - s/N, 0, 1);
+}
+
+/* ══════════════ 물리 ══════════════ */
+const _px = new Float32Array(N), _py = new Float32Array(N), _dg = new Float32Array(N);
+function physics(h){
+  const m = MATS[S.mat], b = S.ball;
+  let cxs=0, cys=0;
+  for(let i=0;i<N;i++){ cxs+=b.p[i].x; cys+=b.p[i].y; }
+  b.cx=cxs/N; b.cy=cys/N;
+
+  const A = polyArea(b.p);
+  const A0 = b.A0 * b.spread;
+  const P  = m.press * (A0 - A) / A0;
+
+  for(let i=0;i<N;i++){
+    const j=(i+1)%N, pi=b.p[i], pj=b.p[j];
+    let dx=pj.x-pi.x, dy=pj.y-pi.y;
+    let L=Math.hypot(dx,dy); if(L<1e-5) L=1e-5;
+    const nx=dx/L, ny=dy/L;
+    // 이웃 스프링(+감쇠). 손상된 구간은 결합이 약해진다 → 그쪽부터 무너짐
+    const w = 1 - 0.75*Math.max(b.dmg[i], b.dmg[j]);
+    const rv = (pj.vx-pi.vx)*nx + (pj.vy-pi.vy)*ny;
+    const f = (m.ke*(L - b.L0[i]*b.scale) + m.kd*rv) * w;
+    pi.vx += nx*f*h; pi.vy += ny*f*h;
+    pj.vx -= nx*f*h; pj.vy -= ny*f*h;
+    // 내부 압력 — 바깥 법선 방향으로
+    let ox=ny, oy=-nx;
+    const mx=(pi.x+pj.x)/2, my=(pi.y+pj.y)/2;
+    if((mx-b.cx)*ox + (my-b.cy)*oy < 0){ ox=-ox; oy=-oy; }
+    const pf = P*L*0.5*h;
+    pi.vx += ox*pf; pi.vy += oy*pf;
+    pj.vx += ox*pf; pj.vy += oy*pf;
+  }
+
+  for(let i=0;i<N;i++){
+    const p=b.p[i];
+    // 원래 모양 기억 — 손상될수록 기억을 잃고, 그만큼 살도 깎인다
+    const keep = 1 - 0.9*b.dmg[i];
+    const sh = 1 - m.shrink*b.dmg[i];
+    const tx = b.cx + b.rest[i].x*b.scale*sh;
+    const ty = b.cy + b.rest[i].y*b.scale*sh;
+    p.vx += (tx-p.x)*m.kshape*keep*h;
+    p.vy += (ty-p.y)*m.kshape*keep*h;
+    p.vy += m.grav*h;
+    const dcy = Math.exp(-m.damp*h);
+    p.vx*=dcy; p.vy*=dcy;
+    p.x += p.vx*h; p.y += p.vy*h;
+  }
+
+  /* 손가락에 눌린 자리의 재료는 옆으로 밀려난다.
+     손가락에서 멀어질수록 약해지는 가우시안 가중치로 바깥쪽으로 밀되,
+     평균(=전체 이동분)은 빼서 공이 통째로 도망가지 않고 찌그러지게만 한다. */
+  S.touches.forEach(t=>{
+    const sig = t.r*1.25 + b.R0*0.36;
+    const k = m.push * clamp(t.press,0,1.4);
+    let ax=0, ay=0;
+    for(let i=0;i<N;i++){
+      const p=b.p[i];
+      let dx=p.x-t.x, dy=p.y-t.y, d=Math.hypot(dx,dy);
+      if(d<0.01){ dx=0; dy=-1; d=1; }
+      const w = Math.exp(-(d*d)/(2*sig*sig));
+      const f = k*w;
+      _px[i] = dx/d*f; _py[i] = dy/d*f;
+      ax += _px[i]; ay += _py[i];
+    }
+    ax/=N; ay/=N;
+    for(let i=0;i<N;i++){ b.p[i].vx += (_px[i]-ax)*h; b.p[i].vy += (_py[i]-ay)*h; }
+  });
+
+  // 손가락 = 원형 장애물. 안쪽으로 파고든 정점은 표면 밖으로 밀어낸다
+  S.touches.forEach(t=>{
+    const Rt = t.r*0.92;
+    for(let i=0;i<N;i++){
+      const p=b.p[i];
+      let dx=p.x-t.x, dy=p.y-t.y, d=Math.hypot(dx,dy);
+      if(d<Rt){
+        if(d<0.01){ dx=0; dy=-1; d=1; }
+        const nx=dx/d, ny=dy/d;
+        p.x = t.x+nx*Rt; p.y = t.y+ny*Rt;
+        const vn = p.vx*nx + p.vy*ny;
+        if(vn<0){ p.vx-=vn*nx; p.vy-=vn*ny; }
+      }
+    }
+  });
+
+  // 바닥 + 좌우 벽
+  for(let i=0;i<N;i++){
+    const p=b.p[i];
+    if(p.y>FLOOR){ p.y=FLOOR; if(p.vy>0) p.vy*=-MATS[S.mat].bounce; p.vx*=0.82; }
+    if(p.x<6){ p.x=6; if(p.vx<0) p.vx*=-0.3; }
+    if(p.x>W-6){ p.x=W-6; if(p.vx>0) p.vx*=-0.3; }
+  }
+}
+
+/* 눌린 모양이 굳어가는 소성 변형 */
+function plasticFlow(dt){
+  const m=MATS[S.mat], b=S.ball;
+  for(let i=0;i<N;i++){
+    const rate = m.plastic * (0.25 + b.dmg[i]) * dt;
+    if(rate<=0) continue;
+    const k = clamp(rate,0,0.35);
+    b.rest[i].x = lerp(b.rest[i].x, (b.p[i].x-b.cx)/b.scale, k);
+    b.rest[i].y = lerp(b.rest[i].y, (b.p[i].y-b.cy)/b.scale, k);
+  }
+}
+
+/* ══════════════ 손상 판정 ══════════════
+   접촉 반경(t.r)이 클수록 손상이 미치는 범위(sig)와 세기가 함께 커지고,
+   누른 시간만큼 계속 쌓인다. → 넓게 대면 넓게, 오래 대면 깊게 부서진다.
+   허공을 누르면(공 밖 + 표면에서도 멀면) 아무 일도 일어나지 않는다. */
+function applyDamage(dt, now){
+  const m = MATS[S.mat], b = S.ball;
+  let loud = 0, moved = 0, anyPress = 0, contact = 0;
+
+  S.touches.forEach(t=>{
+    // 공을 실제로 만지고 있는지
+    let dmin = 1e9;
+    for(let i=0;i<N;i++){
+      const d = Math.hypot(b.p[i].x-t.x, b.p[i].y-t.y);
+      if(d<dmin) dmin=d;
+    }
+    const on = pointInPoly(t.x, t.y, b.p) || dmin < t.r*1.35;
+    t.on = on;
+    if(!on) return;
+    contact = 1;
+
+    const eff = t.press * (0.55 + 0.45*clamp((now-t.t0)/0.55,0,1)); // 시간 램프
+    anyPress = Math.max(anyPress, eff);
+    if(eff < m.trig) return;
+    const over = (eff - m.trig)/(1 - m.trig*0.5);
+    const sig = t.r*1.3 + b.R0*0.40;           // 접촉 면적이 클수록 넓게 먹는다
+    const inv = 1/(2*sig*sig);
+    const rub = clamp(t.speed/900,0,1)*m.rubDmg;
+    for(let i=0;i<N;i++){
+      const dx=b.p[i].x-t.x, dy=b.p[i].y-t.y;
+      const w = Math.exp(-(dx*dx+dy*dy)*inv);  // 접촉 중심에서 멀수록 덜 부서짐
+      if(w<0.012) continue;
+      const acc = 1 + m.accel*b.dmg[i];        // 손상이 손상을 부른다
+      const before = b.dmg[i];
+      const add = m.hardness*over*w*acc*(1+rub)*dt;
+      b.dmg[i] = clamp(before+add, 0, 1);
+      loud = Math.max(loud, add/dt);
+      // 손상 문턱을 넘을 때마다 균열/파편 이벤트.
+      // 같은 자리에서 연달아 터지면 화면·소리가 지저분해지니 쿨다운을 둔다.
+      const step = m.key==='crunch' ? 0.22 : 0.30;
+      if(Math.floor(b.dmg[i]/step) > Math.floor(before/step)
+         && now-b.ct[i] > 0.35 && now-S.lastCrack > 0.05){
+        b.ct[i]=now; S.lastCrack=now;
+        makeCrack(i, b.dmg[i]);
+        Sfx.hit(m.key, 0.35+0.6*eff, false);
+        Hap.event('crack', m.key);
+        spitParts(i, 4+Math.round(6*eff));
+        S.flash = Math.min(1, S.flash+0.25);
+      }
+    }
+    moved = Math.max(moved, t.speed);
+    if(Math.random()<0.4*dt*60*clamp(eff,0,1)) spitParts(nearestIdx(t.x,t.y), 1);
+  });
+
+  // 누르는 동안의 지속 진동 + 문지르는 소리
+  if(anyPress>0.04){
+    Hap.sustain(now, clamp(anyPress*(0.5+0.5*clamp(loud/0.6,0,1)),0,1), m);
+    const gap = m.key==='slush' ? 0.045 : (m.key==='dough' ? 0.28 : 0.13);
+    if(now - S.last > gap*(1.4-0.6*clamp(anyPress,0,1)) && (loud>0.02 || moved>120)){
+      S.last = now;
+      Sfx.hit(m.key, 0.18+0.5*anyPress, false);
+    }
+  }
+
+  // 금이 옆으로 번진다 — 크런치일수록 빠르게, 반죽은 거의 안 번짐
+  const df = m.diffuse*dt;
+  if(df>0.0001){
+    for(let i=0;i<N;i++) _dg[i] = b.dmg[i];
+    for(let i=0;i<N;i++){
+      const a=_dg[(i-1+N)%N], c=_dg[(i+1)%N], me=_dg[i];
+      const avg=(a+c)/2;
+      if(avg>me) b.dmg[i] = clamp(me + (avg-me)*clamp(df,0,0.5)*(0.35+me), 0, 1);
+    }
+  }
+
+  // 퍼짐(누르면 옆으로 벌어짐) + 소성으로 굳은 퍼짐
+  const target = 1 + m.spread*clamp(anyPress,0,1.3)*0.45 + S.ball.plast;
+  S.ball.spread = lerp(S.ball.spread, target, clamp(dt*7,0,1));
+  S.ball.scale  = Math.sqrt(S.ball.spread);
+  if(contact && anyPress>m.trig) S.ball.plast = Math.min(m.spread*0.55, S.ball.plast + m.plastic*0.02*dt*anyPress);
+
+  if(integrity() <= 0.12 && S.phase==='alive') shatter();
+}
+/* 점이 다각형 안에 있는지 (레이 캐스팅) */
+function pointInPoly(x, y, p){
+  let inside=false;
+  for(let i=0,j=p.length-1;i<p.length;j=i++){
+    const yi=p[i].y, yj=p[j].y;
+    if((yi>y)!==(yj>y) && x < (p[j].x-p[i].x)*(y-yi)/(yj-yi)+p[i].x) inside=!inside;
+  }
+  return inside;
+}
+function nearestIdx(x,y){
+  const b=S.ball; let bi=0, bd=1e9;
+  for(let i=0;i<N;i++){ const d=(b.p[i].x-x)**2+(b.p[i].y-y)**2; if(d<bd){bd=d;bi=i;} }
+  return bi;
+}
+
+/* 균열: 링 정점 i에서 안쪽으로 파고드는 지그재그 경로.
+   각 점을 (정점 인덱스, 중심까지의 비율)로 저장해서 몸통이 찌그러지면 같이 따라 움직인다. */
+function makeCrack(i, depth){
+  const b=S.ball, m=MATS[S.mat];
+  const pts=[]; let idx=i, t=1.0;
+  const long = m.key==='crunch';
+  const steps = long ? 2+Math.round(5*depth) : 2+Math.round(2*depth);
+  for(let s=0;s<steps;s++){
+    pts.push({i:((idx%N)+N)%N, t:t});
+    t -= long ? rnd(0.10,0.24)*1.15 : rnd(0.16,0.30);
+    idx += (Math.random()<0.5?-1:1)*(Math.random()<0.35?2:1);
+    if(t<0.12) break;
+  }
+  if(pts.length<2) return;
+  b.cracks.push({pts, w:m.crackW*rnd(0.6,1.2)*depth, born:performance.now()/1000});
+  if(b.cracks.length>46) b.cracks.splice(0, b.cracks.length-46);
+}
+
+/* ══════════════ 파편 / 파티클 ══════════════ */
+function spitParts(i, n){
+  const b=S.ball, m=MATS[S.mat], p=b.p[i];
+  const nx=(p.x-b.cx), ny=(p.y-b.cy), L=Math.hypot(nx,ny)||1;
+  for(let k=0;k<n;k++){
+    S.parts.push({
+      x:p.x+rnd(-5,5), y:p.y+rnd(-5,5),
+      vx: nx/L*rnd(30,190)+rnd(-70,70),
+      vy: ny/L*rnd(30,150)+rnd(-160,-20),
+      r: m.key==='slush'? rnd(1.4,4) : rnd(1.8,5.5),
+      rot: Math.random()*TAU, vr: rnd(-9,9),
+      life: 0, max: rnd(0.5,1.3),
+      c: [m.col.a,m.col.b,m.col.c][(Math.random()*3)|0],
+      round: m.key!=='crunch'
+    });
+  }
+  if(S.parts.length>420) S.parts.splice(0, S.parts.length-420);
+}
+
+function shatter(){
+  const b=S.ball, m=MATS[S.mat];
+  S.phase='broken'; S.tBreak=performance.now()/1000;
+  const took = S.tFirst ? (S.tBreak - S.tFirst) : 0;
+  if(took>0.2){
+    const cur = S.best[S.mat];
+    if(!cur || took<cur){ S.best[S.mat]=took; localStorage.setItem('wk.best', JSON.stringify(S.best)); }
+  }
+  S.broken++;
+  S.shake = 1; S.flash = 1;
+  Sfx.hit(m.key, 1.3, true);
+  Hap.event('break', m.key);
+
+  /* 링을 부채꼴로 자르고, 다시 안쪽/바깥쪽 두 겹으로 나눠서
+     피자 조각이 아니라 진짜 파편처럼 보이게 한다. */
+  const k = m.key==='crunch' ? 10 : (m.key==='dough' ? 5 : 9);
+  const cuts=[0];
+  for(let i=1;i<k;i++) cuts.push(Math.round(N*i/k + rnd(-2,2)));
+  cuts.push(N);
+  const at=(i,t)=>({ x:lerp(b.cx, b.p[i%N].x, t), y:lerp(b.cy, b.p[i%N].y, t) });
+  const push=(poly)=>{
+    let mx=0,my=0; for(const q of poly){ mx+=q.x; my+=q.y; } mx/=poly.length; my/=poly.length;
+    const dx=mx-b.cx, dy=my-b.cy, L=Math.hypot(dx,dy)||1;
+    const sp = m.key==='crunch'? rnd(200,450) : (m.key==='slush'? rnd(110,290) : rnd(60,180));
+    S.pieces.push({
+      poly: poly.map(q=>({x:q.x-mx, y:q.y-my})),
+      x:mx, y:my,
+      vx: dx/L*sp + rnd(-80,80),
+      vy: dy/L*sp + rnd(-340,-110),
+      rot:0, vr: rnd(-8,8)*(m.key==='crunch'?1:0.4),
+      life:0, max: rnd(1.3,1.8), squash: m.key==='dough'?1:0
+    });
+  };
+  for(let s=0;s<k;s++){
+    const a=cuts[s], z=cuts[s+1];
+    const mid = rnd(0.42,0.6);
+    const outer=[], inner=[{x:b.cx,y:b.cy}];
+    for(let i=a;i<=z;i++) outer.push(at(i,1));
+    for(let i=z;i>=a;i--) outer.push(at(i,mid));
+    for(let i=a;i<=z;i++) inner.push(at(i,mid));
+    push(outer); push(inner);
+  }
+  const burstN = m.key==='slush'? 90 : (m.key==='crunch'? 70 : 34);
+  for(let i=0;i<burstN;i++) spitParts((Math.random()*N)|0, 1);
+
+  const el=document.getElementById('burst');
+  el.innerHTML = m.pop + (took>0.2 ? '<small>'+took.toFixed(2)+'초</small>' : '');
+  el.style.color = m.col.accent;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 900);
+  setTimeout(()=>{ if(S.phase==='broken') spawnBall(); }, 1050);
+}
+
+function stepDebris(dt){
+  for(let i=S.pieces.length-1;i>=0;i--){
+    const p=S.pieces[i];
+    p.life+=dt; p.vy += 1500*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.rot+=p.vr*dt;
+    if(p.y>FLOOR){ p.y=FLOOR; p.vy*=-0.28; p.vx*=0.7; p.vr*=0.5; if(p.squash) p.squash=Math.min(2.2,p.squash+0.5); }
+    if(p.life>p.max) S.pieces.splice(i,1);
+  }
+  for(let i=S.parts.length-1;i>=0;i--){
+    const q=S.parts[i];
+    q.life+=dt; q.vy += 1350*dt; q.x+=q.vx*dt; q.y+=q.vy*dt; q.rot+=q.vr*dt;
+    q.vx*=Math.exp(-1.4*dt);
+    if(q.y>FLOOR){ q.y=FLOOR; q.vy*=-0.24; q.vx*=0.66; }
+    if(q.life>q.max) S.parts.splice(i,1);
+  }
+}
+
+/* ══════════════ 그리기 ══════════════ */
+function ringPath(pts){
+  cx2.beginPath();
+  const n=pts.length;
+  let mx=(pts[n-1].x+pts[0].x)/2, my=(pts[n-1].y+pts[0].y)/2;
+  cx2.moveTo(mx,my);
+  for(let i=0;i<n;i++){
+    const a=pts[i], b=pts[(i+1)%n];
+    cx2.quadraticCurveTo(a.x, a.y, (a.x+b.x)/2, (a.y+b.y)/2);
+  }
+  cx2.closePath();
+}
+
+function draw(now){
+  const m=MATS[S.mat];
+  // 배경
+  const g=cx2.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,m.col.bg[0]); g.addColorStop(1,m.col.bg[1]);
+  cx2.fillStyle=g; cx2.fillRect(0,0,W,H);
+
+  cx2.save();
+  if(S.shake>0.01){
+    const s=S.shake*9;
+    cx2.translate(rnd(-s,s), rnd(-s,s));
+  }
+
+  // 바닥 면
+  const fg=cx2.createLinearGradient(0,FLOOR-4,0,H);
+  fg.addColorStop(0,'rgba(255,255,255,.055)'); fg.addColorStop(1,'rgba(0,0,0,.25)');
+  cx2.fillStyle=fg; cx2.fillRect(0,FLOOR,W,H-FLOOR);
+  cx2.strokeStyle='rgba(255,255,255,.09)'; cx2.lineWidth=1;
+  cx2.beginPath(); cx2.moveTo(0,FLOOR+.5); cx2.lineTo(W,FLOOR+.5); cx2.stroke();
+
+  const b=S.ball;
+  if(b && S.phase==='alive'){
+    // 그림자
+    let minx=1e9,maxx=-1e9;
+    for(const p of b.p){ if(p.x<minx)minx=p.x; if(p.x>maxx)maxx=p.x; }
+    const sw=(maxx-minx)/2;
+    cx2.save();
+    cx2.globalAlpha=0.42; cx2.fillStyle='#000';
+    cx2.beginPath(); cx2.ellipse(b.cx, FLOOR+3, sw*0.94, Math.max(5,sw*0.16), 0,0,TAU);
+    cx2.filter='blur(6px)'; cx2.fill(); cx2.restore();
+
+    // 몸통
+    ringPath(b.p);
+    const bg2=cx2.createRadialGradient(
+      b.cx-b.R0*0.34, b.cy-b.R0*0.42, b.R0*0.06,
+      b.cx, b.cy, b.R0*1.35);
+    bg2.addColorStop(0, m.col.a);
+    bg2.addColorStop(0.52, m.col.b);
+    bg2.addColorStop(1, m.col.c);
+    cx2.fillStyle=bg2; cx2.fill();
+
+    // 손상된 표면은 어둡고 거칠게
+    cx2.save(); cx2.clip();
+    for(let i=0;i<N;i++){
+      if(b.dmg[i]<0.08) continue;
+      const p=b.p[i];
+      const rr=b.R0*(0.16+0.24*b.dmg[i]);
+      const dg=cx2.createRadialGradient(p.x,p.y,0,p.x,p.y,rr);
+      dg.addColorStop(0, hexA(m.col.crack, 0.42*b.dmg[i]));
+      dg.addColorStop(1, hexA(m.col.crack, 0));
+      cx2.fillStyle=dg;
+      cx2.beginPath(); cx2.arc(p.x,p.y,rr,0,TAU); cx2.fill();
+    }
+    // 균열 — 크런치는 날카로운 금, 반죽은 눌린 주름, 슬러시는 젖어 녹은 자국
+    for(const c of b.cracks){
+      const pos=[];
+      for(const q of c.pts){
+        const p=b.p[q.i];
+        pos.push({x:lerp(b.cx,p.x,q.t), y:lerp(b.cy,p.y,q.t)});
+      }
+      if(m.crackKind==='melt'){
+        for(let k=0;k<pos.length;k++){
+          const rr=c.w*(2.2-0.5*k);
+          if(rr<=0) continue;
+          const mg=cx2.createRadialGradient(pos[k].x,pos[k].y,0,pos[k].x,pos[k].y,rr);
+          mg.addColorStop(0, hexA(m.col.crack,.34));
+          mg.addColorStop(1, hexA(m.col.crack,0));
+          cx2.fillStyle=mg; cx2.beginPath(); cx2.arc(pos[k].x,pos[k].y,rr,0,TAU); cx2.fill();
+        }
+        continue;
+      }
+      cx2.beginPath();
+      for(let k=0;k<pos.length;k++) k===0?cx2.moveTo(pos[k].x,pos[k].y):cx2.lineTo(pos[k].x,pos[k].y);
+      cx2.lineCap='round'; cx2.lineJoin='round';
+      if(m.crackKind==='crack'){
+        cx2.strokeStyle=hexA(m.col.crack,.92); cx2.lineWidth=c.w; cx2.stroke();
+        cx2.strokeStyle=hexA(m.col.spark,.22); cx2.lineWidth=c.w*0.35; cx2.stroke();
+      } else {
+        cx2.strokeStyle=hexA(m.col.crack,.22); cx2.lineWidth=c.w*1.6; cx2.stroke();
+        cx2.strokeStyle=hexA(m.col.spark,.10); cx2.lineWidth=c.w*0.5; cx2.stroke();
+      }
+    }
+    // 손가락 아래 눌린 자국
+    S.touches.forEach(t=>{
+      const rr=t.r*1.5;
+      const pg=cx2.createRadialGradient(t.x,t.y,0,t.x,t.y,rr);
+      pg.addColorStop(0,'rgba(0,0,0,'+(0.30+0.28*clamp(t.press,0,1))+')');
+      pg.addColorStop(0.72,'rgba(0,0,0,.10)');
+      pg.addColorStop(1,'rgba(0,0,0,0)');
+      cx2.fillStyle=pg; cx2.beginPath(); cx2.arc(t.x,t.y,rr,0,TAU); cx2.fill();
+      // 눌린 테두리 하이라이트
+      cx2.strokeStyle=hexA(m.col.spark, 0.10+0.14*clamp(t.press,0,1));
+      cx2.lineWidth=2; cx2.beginPath(); cx2.arc(t.x,t.y,t.r*1.02,0,TAU); cx2.stroke();
+    });
+    // 광택
+    const hg=cx2.createRadialGradient(
+      b.cx-b.R0*0.36, b.cy-b.R0*0.48, 0,
+      b.cx-b.R0*0.36, b.cy-b.R0*0.48, b.R0*0.62);
+    hg.addColorStop(0, hexA(m.col.spark, m.key==='slush'?0.55:0.32));
+    hg.addColorStop(1, hexA(m.col.spark, 0));
+    cx2.fillStyle=hg; cx2.beginPath();
+    cx2.ellipse(b.cx-b.R0*0.36, b.cy-b.R0*0.48, b.R0*0.52, b.R0*0.38, -0.5,0,TAU); cx2.fill();
+    cx2.restore();
+
+    // 외곽선
+    ringPath(b.p);
+    cx2.strokeStyle=hexA(m.col.crack, 0.30); cx2.lineWidth=1.6; cx2.stroke();
+  }
+
+  // 파편 조각
+  for(const p of S.pieces){
+    const a = 1 - clamp((p.life-(p.max-0.5))/0.5, 0, 1);
+    cx2.save(); cx2.globalAlpha=a;
+    cx2.translate(p.x,p.y); cx2.rotate(p.rot);
+    if(p.squash) cx2.scale(1+p.squash*0.22, 1/(1+p.squash*0.22));
+    cx2.beginPath();
+    cx2.moveTo(p.poly[0].x,p.poly[0].y);
+    for(let i=1;i<p.poly.length;i++) cx2.lineTo(p.poly[i].x,p.poly[i].y);
+    cx2.closePath();
+    const pg=cx2.createLinearGradient(-30,-30,30,30);
+    pg.addColorStop(0,m.col.a); pg.addColorStop(1,m.col.c);
+    cx2.fillStyle=pg; cx2.fill();
+    cx2.strokeStyle=hexA(m.col.crack,.5); cx2.lineWidth=1.2; cx2.stroke();
+    cx2.restore();
+  }
+  // 부스러기
+  for(const q of S.parts){
+    const a = 1 - q.life/q.max;
+    cx2.save(); cx2.globalAlpha=clamp(a,0,1); cx2.fillStyle=q.c;
+    cx2.translate(q.x,q.y); cx2.rotate(q.rot);
+    if(q.round){ cx2.beginPath(); cx2.arc(0,0,q.r,0,TAU); cx2.fill(); }
+    else cx2.fillRect(-q.r,-q.r*0.7,q.r*2,q.r*1.4);
+    cx2.restore();
+  }
+
+  // 터치 링(손가락 접촉 반경 시각화)
+  S.touches.forEach(t=>{
+    cx2.strokeStyle=hexA(m.col.accent, 0.20+0.25*clamp(t.press,0,1));
+    cx2.lineWidth=2;
+    cx2.beginPath(); cx2.arc(t.x,t.y,t.r,0,TAU); cx2.stroke();
+  });
+
+  cx2.restore();
+
+  if(S.flash>0.01){
+    cx2.fillStyle=hexA(m.col.spark, S.flash*0.10);
+    cx2.fillRect(0,0,W,H);
+  }
+}
+function hexA(hex,a){
+  const h=hex.replace('#','');
+  const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+  return 'rgba('+r+','+g+','+b+','+clamp(a,0,1)+')';
+}
+
+/* ══════════════ 입력 ══════════════
+   PointerEvent의 width/height(접촉 크기)와 pressure(압력)를 읽어서
+   "얼마나 넓게, 얼마나 세게" 눌렀는지 계산한다. 기기가 값을 안 주면
+   기본값 + 누른 시간으로 보정한다. */
+function readTouch(e){
+  const w=e.width||0, h=e.height||0;
+  let r = (w&&h) ? (w+h)/4 : 0;
+  const synthetic = !(r>3);
+  if(synthetic) r = 21;
+  r = clamp(r, 9, 62);
+  const areaF = clamp((r-11)/26, 0, 1.25);
+  let pr = (typeof e.pressure==='number') ? e.pressure : 0;
+  // 0 / 0.5 / 1 은 "센서 없음"의 기본값일 확률이 높다 → 무시
+  const hasForce = pr>0.02 && Math.abs(pr-0.5)>0.03 && Math.abs(pr-1)>0.03;
+  const press = clamp(0.30 + 0.72*areaF + (hasForce ? 0.55*pr : 0), 0, 1.5);
+  return {r, press, synthetic, hasForce};
+}
+function onDown(e){
+  if(e.target.closest && e.target.closest('#dock')) return;
+  e.preventDefault();
+  Sfx.init(); Sfx.resume();
+  const d=readTouch(e);
+  const now=performance.now()/1000;
+  S.touches.set(e.pointerId, {
+    x:e.clientX, y:e.clientY, px:e.clientX, py:e.clientY,
+    r:d.r, press:d.press, raw:d, t0:now, speed:0
+  });
+  if(!S.tFirst) S.tFirst=now;
+  document.getElementById('hint').classList.remove('show');
+  localStorage.setItem('wk.seen','1');
+  if(cv.setPointerCapture) { try{ cv.setPointerCapture(e.pointerId); }catch(err){} }
+}
+function onMove(e){
+  const t=S.touches.get(e.pointerId); if(!t) return;
+  e.preventDefault();
+  const d=readTouch(e);
+  const dx=e.clientX-t.x, dy=e.clientY-t.y;
+  t.speed = lerp(t.speed, Math.hypot(dx,dy)*60, 0.35);
+  t.x=e.clientX; t.y=e.clientY;
+  // 손가락을 계속 누르면 접촉면이 커지는 걸 부드럽게 반영
+  t.r = lerp(t.r, d.r, 0.25);
+  t.press = lerp(t.press, d.press, 0.3);
+  t.raw = d;
+}
+function onUp(e){
+  const t=S.touches.get(e.pointerId);
+  if(t){
+    S.touches.delete(e.pointerId);
+    if(S.phase==='alive' && MATS[S.mat].key==='dough' && t.press>0.3) Sfx.dough(0.4,true);
+  }
+  if(S.touches.size===0){ Hap.stop(); Hap.nextAt=0; }
+}
+cv.addEventListener('pointerdown', onDown, {passive:false});
+cv.addEventListener('pointermove', onMove, {passive:false});
+window.addEventListener('pointerup', onUp);
+window.addEventListener('pointercancel', onUp);
+document.addEventListener('touchmove', e=>{ if(!e.target.closest || !e.target.closest('#dock')) e.preventDefault(); }, {passive:false});
+document.addEventListener('gesturestart', e=>e.preventDefault());
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ S.touches.clear(); Hap.stop(); } });
+
+/* ══════════════ UI ══════════════ */
+const elMat=document.getElementById('matName'), elStage=document.getElementById('stage'),
+      elStats=document.getElementById('stats'), elBar=document.getElementById('bar'),
+      elProbe=document.getElementById('probe');
+
+function setMat(k){
+  S.mat=k; localStorage.setItem('wk.mat',k);
+  document.querySelectorAll('.mat').forEach(el=>{
+    const on = el.dataset.m===k;
+    el.classList.toggle('on',on);
+    el.style.borderColor = on ? MATS[k].col.accent : 'rgba(255,255,255,.10)';
+  });
+  document.querySelector('meta[name=theme-color]').setAttribute('content', MATS[k].col.bg[1]);
+  elMat.textContent = MATS[k].emoji+' '+MATS[k].label;
+  S.pieces.length=0; S.parts.length=0;
+  spawnBall();
+}
+document.querySelectorAll('.mat').forEach(el=>{
+  el.addEventListener('click', ()=>{ Sfx.init(); Sfx.resume(); setMat(el.dataset.m); Hap.buzz(9); });
+});
+const tVib=document.getElementById('tVib'), tSnd=document.getElementById('tSnd');
+function syncTools(){
+  tVib.classList.toggle('off', !Hap.on);
+  tSnd.classList.toggle('off', !Sfx.on);
+  tVib.textContent = (Hap.ok? '📳 진동' : '📳 미지원');
+  tSnd.textContent = '🔊 소리';
+}
+tVib.addEventListener('click', ()=>{
+  Hap.on=!Hap.on; localStorage.setItem('wk.vib', Hap.on?'1':'0');
+  if(Hap.on) Hap.pat([0,12,20,12]); else Hap.stop();
+  syncTools();
+});
+tSnd.addEventListener('click', ()=>{
+  Sfx.on=!Sfx.on; localStorage.setItem('wk.snd', Sfx.on?'1':'0');
+  if(Sfx.on){ Sfx.init(); Sfx.resume(); Sfx.hit(S.mat,0.5,false); }
+  syncTools();
+});
+document.getElementById('tNew').addEventListener('click', ()=>{
+  Sfx.init(); Sfx.resume();
+  S.pieces.length=0; S.parts.length=0; spawnBall(); Hap.buzz(9);
+});
+
+function updateHUD(now){
+  const m=MATS[S.mat], v=integrity();
+  const st = v>0.75?0 : v>0.5?1 : v>0.22?2 : 3;
+  elStage.textContent = m.stages[st];
+  elBar.style.width = (v*100).toFixed(1)+'%';
+  elBar.style.background = v>0.5
+    ? m.col.accent
+    : (v>0.22 ? '#e8a33c' : '#e2543f');
+  const bt = S.best[S.mat];
+  elStats.innerHTML = '부순 개수 <b>'+S.broken+'</b>' + (bt? ' · 최고 '+bt.toFixed(2)+'초' : '');
+  // 접촉 정보 — 화면 픽셀을 대략 mm로 환산(1px ≈ 0.2646mm)
+  if(S.touches.size){
+    let s=[];
+    S.touches.forEach(t=>{
+      const mm=(t.r*2*25.4/96).toFixed(0);
+      s.push('접촉 ⌀'+mm+'mm · 압력 '+Math.round(clamp(t.press,0,1.5)*100)+'%'
+             + (t.raw && t.raw.hasForce ? ' (센서)' : '')
+             + ' · '+((now-t.t0)).toFixed(1)+'초');
+    });
+    elProbe.textContent = s.join('   |   ');
+  } else {
+    elProbe.textContent = Hap.ok ? '' : '이 브라우저는 진동을 지원하지 않아요 (안드로이드 크롬 권장)';
+  }
+}
+
+/* ══════════════ 루프 ══════════════ */
+let prev = performance.now();
+let acc = 0;
+function frame(ts){
+  const now = ts/1000;
+  let dt = (ts-prev)/1000; prev=ts;
+  dt = Math.min(dt, 0.05);
+
+  if(S.ball && S.phase==='alive'){
+    acc += dt;
+    const h = 1/300;
+    let guard=0;
+    while(acc>h && guard<40){ physics(h); acc-=h; guard++; }
+    if(guard>=40) acc=0;
+    plasticFlow(dt);
+    applyDamage(dt, now);
+  }
+  stepDebris(dt);
+  S.shake = Math.max(0, S.shake - dt*3.2);
+  S.flash = Math.max(0, S.flash - dt*2.6);
+
+  draw(now);
+  updateHUD(now);
+  requestAnimationFrame(frame);
+}
+
+/* ══════════════ 시작 ══════════════ */
+resize();
+setMat(MATS[S.mat] ? S.mat : 'crunch');
+syncTools();
+if(!localStorage.getItem('wk.seen')){
+  setTimeout(()=>document.getElementById('hint').classList.add('show'), 500);
+}
+requestAnimationFrame(frame);
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>

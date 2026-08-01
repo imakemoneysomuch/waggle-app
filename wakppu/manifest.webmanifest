@@ -1,0 +1,17 @@
+{
+  "name": "왁뿌볼 부수기",
+  "short_name": "왁뿌볼",
+  "description": "한 손으로 만져서 부수는 촉감 시뮬레이터 — 반죽 · 크런치 · 슬러시",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0b0603",
+  "theme_color": "#0b0603",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
