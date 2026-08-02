@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>고양이 케어 관리</title>
+    <meta name="theme-color" content="#2b1d12" />
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
+    <link rel="icon" type="image/png" href="../icon-192.png" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <style>
+      :root {
+        --bg: #f7f1e8;
+        --ink: #2b1d12;
+        --ink-soft: #6b5847;
+        --line: #e3d7c6;
+        --card: #fffdf9;
+        --accent: #b4671f;
+        --accent-soft: #f4e6d4;
+        --ok: #3f7d4e;
+        --warn: #b3452c;
+      }
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR',
+          'Malgun Gothic', sans-serif;
+        line-height: 1.5;
+        padding: 0 0 env(safe-area-inset-bottom);
+      }
+      .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px 48px; }
+
+      header {
+        position: sticky; top: 0; z-index: 5;
+        background: var(--ink); color: #f7f1e8;
+        padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+      }
+      header .inner { max-width: 560px; margin: 0 auto; }
+      header h1 { margin: 0; font-size: 19px; letter-spacing: -0.2px; }
+      header p { margin: 4px 0 0; font-size: 12.5px; opacity: 0.72; }
+
+      .datebar {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 8px; margin: 14px 0 10px;
+      }
+      .datebar .label { font-size: 14px; font-weight: 700; }
+      .datebar .today { font-size: 11.5px; color: var(--ink-soft); font-weight: 500; }
+      .navbtn {
+        border: 1px solid var(--line); background: var(--card); color: var(--ink);
+        width: 34px; height: 34px; border-radius: 10px; font-size: 15px;
+        cursor: pointer; flex: none;
+      }
+      .navbtn:disabled { opacity: 0.35; cursor: default; }
+
+      section { margin-top: 18px; }
+      h2 {
+        font-size: 13px; letter-spacing: 0.3px; text-transform: none;
+        color: var(--ink-soft); margin: 0 0 8px; font-weight: 700;
+      }
+      .card {
+        background: var(--card); border: 1px solid var(--line);
+        border-radius: 14px; overflow: hidden;
+      }
+
+      .bar { height: 8px; background: var(--accent-soft); margin: 8px 0 0; }
+      .bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width 0.25s; }
+      .barmeta {
+        display: flex; justify-content: space-between; align-items: baseline;
+        padding: 10px 14px 2px; font-size: 12.5px; color: var(--ink-soft);
+      }
+      .barmeta b { font-size: 15px; color: var(--ink); }
+
+      ul { list-style: none; margin: 0; padding: 0; }
+      li.item { border-top: 1px solid var(--line); }
+      li.item:first-child { border-top: 0; }
+      label.row {
+        display: flex; gap: 12px; align-items: flex-start;
+        padding: 12px 14px; cursor: pointer;
+      }
+      label.row input { display: none; }
+      .box {
+        flex: none; width: 22px; height: 22px; border-radius: 7px; margin-top: 1px;
+        border: 1.5px solid var(--line); background: #fff;
+        display: grid; place-items: center; font-size: 13px; color: transparent;
+      }
+      input:checked + .box { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .txt { min-width: 0; }
+      .txt .t { font-size: 14.5px; font-weight: 600; }
+      .txt .d { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+      input:checked ~ .txt .t { text-decoration: line-through; color: var(--ink-soft); font-weight: 500; }
+
+      li.per { border-top: 1px solid var(--line); padding: 12px 14px; display: flex; gap: 12px; align-items: center; }
+      li.per:first-child { border-top: 0; }
+      li.per .txt { flex: 1; }
+      .since { font-size: 12px; margin-top: 2px; }
+      .since.ok { color: var(--ok); }
+      .since.due { color: var(--warn); font-weight: 600; }
+      .since.none { color: var(--ink-soft); }
+      .donebtn {
+        flex: none; border: 1px solid var(--accent); background: var(--accent-soft);
+        color: var(--accent); font-weight: 700; font-size: 12.5px;
+        padding: 7px 11px; border-radius: 9px; cursor: pointer;
+      }
+      .donebtn:active { background: var(--accent); color: #fff; }
+
+      details.tip { border-top: 1px solid var(--line); }
+      details.tip:first-child { border-top: 0; }
+      details.tip > summary {
+        list-style: none; cursor: pointer; padding: 12px 14px;
+        font-size: 14.5px; font-weight: 600;
+        display: flex; justify-content: space-between; gap: 10px; align-items: center;
+      }
+      details.tip > summary::-webkit-details-marker { display: none; }
+      details.tip > summary::after { content: '+'; color: var(--ink-soft); font-size: 17px; flex: none; }
+      details.tip[open] > summary::after { content: '−'; }
+      details.tip .body { padding: 0 14px 12px; }
+      details.tip .body p { margin: 0 0 7px; font-size: 13.5px; color: var(--ink-soft); }
+      details.tip .body p:last-child { margin-bottom: 0; }
+      details.tip .body b { color: var(--ink); }
+
+      .foot { margin-top: 22px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+      .foot a, .foot button {
+        font-size: 12.5px; color: var(--ink-soft); background: none; border: 0;
+        text-decoration: none; cursor: pointer; padding: 4px 0;
+      }
+      .foot button { color: var(--warn); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="inner">
+        <h1>🐱 고양이 케어 관리</h1>
+        <p>매일 체크 · 주기 관리 · 양육 가이드</p>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="datebar">
+        <button class="navbtn" id="prev" aria-label="이전 날">‹</button>
+        <div style="text-align: center">
+          <div class="label" id="dateLabel">—</div>
+          <div class="today" id="dateSub"></div>
+        </div>
+        <button class="navbtn" id="next" aria-label="다음 날">›</button>
+      </div>
+
+      <section>
+        <h2>오늘의 체크</h2>
+        <div class="card">
+          <div class="barmeta"><span><b id="doneCount">0</b> / <span id="totalCount">0</span> 완료</span><span id="pct">0%</span></div>
+          <div class="bar"><i id="barFill"></i></div>
+          <ul id="daily"></ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>주기 케어</h2>
+        <div class="card"><ul id="periodic"></ul></div>
+      </section>
+
+      <section>
+        <h2>양육 가이드</h2>
+        <div class="card" id="tips"></div>
+      </section>
+
+      <div class="foot">
+        <a href="../">← 와글와글 홈</a>
+        <button id="reset">기록 전체 삭제</button>
+      </div>
+    </div>
+
+    <script>
+      'use strict'
+
+      /* 기록은 기기 안에만 둔다 — 서버가 없는 정적 화면이라 localStorage 하나로 충분 */
+      var KEY = 'waggle-cat-care-v1'
+
+      var DAILY = [
+        { id: 'eye', t: '눈꼽 떼어주기', d: '동물용 물티슈로 매일 닦아 청결 유지' },
+        { id: 'water', t: '물 갈아주기 · 급수기 확인', d: '물을 안 마시면 병나기 쉬움. 밥그릇과 멀리 떨어뜨려 두기' },
+        { id: 'teeth', t: '양치', d: '생후 7개월부터. 습식사료를 먹인 날은 특히 신경 쓰기' },
+        { id: 'play1', t: '놀이 1회차', d: '카샤카샤 등으로 충분히. 지칠 만큼, 단 과하지 않게' },
+        { id: 'play2', t: '놀이 2회차', d: '하루 최소 2번 이상' },
+        { id: 'meal', t: '밥 급여 · 간식은 따로', d: '간식을 밥과 같이 주면 밥을 안 먹게 됨' },
+        { id: 'litter', t: '화장실 확인', d: '배변 상태를 매일 눈으로 확인' },
+      ]
+
+      var PERIODIC = [
+        { id: 'bath', t: '목욕', every: 30, d: '어릴 때부터 자주 해야 습관이 든다' },
+        { id: 'nail', t: '손톱 깎기', every: 14, d: '어릴 때부터 익숙해지게' },
+        { id: 'butt', t: '똥꼬 케어', every: 7, d: '평소엔 스스로 하게 두고 냄새 심할 때만 똥꼬 스키로' },
+        { id: 'fountain', t: '급수기 청소', every: 7, d: '물맛이 떨어지면 음수량이 준다' },
+        { id: 'toy', t: '장난감 점검 · 교체', every: 14, d: '칫솔 장난감도 같이 확인' },
+      ]
+
+      var TIPS = [
+        {
+          t: '1. 그루밍과 청결 관리',
+          b: [
+            '고양이는 본능적으로 스스로 닦지만, <b>어릴 때부터 습관을 들이는 것</b>이 중요합니다.',
+            '똥꼬는 평소엔 스스로 하게 두고, 냄새가 심할 때나 <b>똥꼬 스키(동물용 물티슈)</b>로만 닦아주세요. 너무 자주 닦으면 의존하게 됩니다.',
+            '매일 눈꼽을 떼어주고, 동물용 물티슈로 청결을 유지하세요.',
+            '목욕과 손톱 깎기는 어릴 때부터 자주 해주는 게 습관 들이기에 좋습니다.',
+          ],
+        },
+        {
+          t: '2. 양치 관리',
+          b: [
+            '<b>생후 7개월</b>부터 시작하되, 어릴 때부터 칫솔 장난감으로 익숙해지는 게 중요합니다.',
+            '치약은 다이소 제품 중 <b>치킨맛이나 생선맛</b>을 쓰고, 치즈맛은 피하세요.',
+            '습식사료를 먹일 경우 양치를 특히 신경 써야 합니다.',
+          ],
+        },
+        {
+          t: '3. 물 섭취',
+          b: [
+            '고양이는 물 섭취가 매우 중요하며, 물을 안 마시면 병에 걸리기 쉽습니다.',
+            '가능하면 <b>자동 급수기</b>를 쓰고, 밥과는 멀리 떨어진 곳에 물을 두는 습관을 들이세요.',
+          ],
+        },
+        {
+          t: '4. 간식과 식사',
+          b: [
+            '간식을 너무 많이 주면 밥을 안 먹을 수 있으니 주의하세요.',
+            '간식은 <b>밥과 함께 주지 말고 따로</b> 주는 게 좋습니다.',
+          ],
+        },
+        {
+          t: '5. 놀이와 건강',
+          b: [
+            '하루에 <b>최소 2번 이상</b> 충분히 놀려주세요. 지칠 때까지 놀리되 너무 과하지 않게 조절합니다.',
+            '카샤카샤(카트) 같은 장난감이 인기가 많습니다.',
+          ],
+        },
+        {
+          t: '6. 기타',
+          b: [
+            '고양이는 서로를 지켜보는 습성이 있어 초기에는 환경을 정리해주는 게 중요하지만, 익숙해지면 자연스럽게 지냅니다.',
+          ],
+        },
+      ]
+
+      function load() {
+        try {
+          var raw = localStorage.getItem(KEY)
+          var v = raw ? JSON.parse(raw) : null
+          if (!v || typeof v !== 'object') v = {}
+          if (!v.daily || typeof v.daily !== 'object') v.daily = {}
+          if (!v.periodic || typeof v.periodic !== 'object') v.periodic = {}
+          return v
+        } catch (e) {
+          return { daily: {}, periodic: {} }
+        }
+      }
+      function save() {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(state))
+        } catch (e) {
+          /* 저장이 막혀도 화면은 계속 쓸 수 있게 둔다 */
+        }
+      }
+
+      /* 날짜 키는 기기 현지 시각 기준 — toISOString은 UTC라 하루가 밀린다 */
+      function ymd(d) {
+        var m = d.getMonth() + 1
+        var day = d.getDate()
+        return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day)
+      }
+      function startOfDay(d) {
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+      }
+      function daysBetween(aKey, bKey) {
+        var a = new Date(aKey + 'T00:00:00')
+        var b = new Date(bKey + 'T00:00:00')
+        return Math.round((b - a) / 86400000)
+      }
+
+      var state = load()
+      var today = startOfDay(new Date())
+      var cursor = new Date(today)
+
+      var WEEK = ['일', '월', '화', '수', '목', '금', '토']
+
+      function renderDate() {
+        var key = ymd(cursor)
+        var diff = daysBetween(ymd(today), key)
+        var label = cursor.getMonth() + 1 + '월 ' + cursor.getDate() + '일 (' + WEEK[cursor.getDay()] + ')'
+        document.getElementById('dateLabel').textContent = label
+        document.getElementById('dateSub').textContent =
+          diff === 0 ? '오늘' : diff === -1 ? '어제' : diff < 0 ? -diff + '일 전' : diff + '일 뒤'
+        document.getElementById('next').disabled = diff >= 0
+      }
+
+      function renderDaily() {
+        var key = ymd(cursor)
+        var day = state.daily[key] || {}
+        var ul = document.getElementById('daily')
+        ul.innerHTML = ''
+        var done = 0
+        DAILY.forEach(function (it) {
+          var checked = !!day[it.id]
+          if (checked) done++
+          var li = document.createElement('li')
+          li.className = 'item'
+          var lab = document.createElement('label')
+          lab.className = 'row'
+          var inp = document.createElement('input')
+          inp.type = 'checkbox'
+          inp.checked = checked
+          inp.addEventListener('change', function () {
+            var d = state.daily[key] || (state.daily[key] = {})
+            if (inp.checked) d[it.id] = 1
+            else delete d[it.id]
+            if (!Object.keys(d).length) delete state.daily[key]
+            save()
+            renderDaily()
+          })
+          var box = document.createElement('span')
+          box.className = 'box'
+          box.textContent = '✓'
+          var txt = document.createElement('span')
+          txt.className = 'txt'
+          var t = document.createElement('span')
+          t.className = 't'
+          t.textContent = it.t
+          var d2 = document.createElement('span')
+          d2.className = 'd'
+          d2.textContent = it.d
+          txt.appendChild(t)
+          txt.appendChild(document.createElement('br'))
+          txt.appendChild(d2)
+          lab.appendChild(inp)
+          lab.appendChild(box)
+          lab.appendChild(txt)
+          li.appendChild(lab)
+          ul.appendChild(li)
+        })
+        var pct = Math.round((done / DAILY.length) * 100)
+        document.getElementById('doneCount').textContent = done
+        document.getElementById('totalCount').textContent = DAILY.length
+        document.getElementById('pct').textContent = pct + '%'
+        document.getElementById('barFill').style.width = pct + '%'
+      }
+
+      function renderPeriodic() {
+        var todayKey = ymd(today)
+        var ul = document.getElementById('periodic')
+        ul.innerHTML = ''
+        PERIODIC.forEach(function (it) {
+          var last = state.periodic[it.id]
+          var li = document.createElement('li')
+          li.className = 'per'
+
+          var txt = document.createElement('div')
+          txt.className = 'txt'
+          var t = document.createElement('div')
+          t.className = 't'
+          t.style.fontSize = '14.5px'
+          t.style.fontWeight = '600'
+          t.textContent = it.t
+          var since = document.createElement('div')
+          since.className = 'since'
+          if (!last) {
+            since.className += ' none'
+            since.textContent = '기록 없음 · 권장 ' + it.every + '일마다'
+          } else {
+            var ago = daysBetween(last, todayKey)
+            var overdue = ago >= it.every
+            since.className += overdue ? ' due' : ' ok'
+            since.textContent =
+              (ago === 0 ? '오늘 완료' : ago + '일 전') +
+              ' · 권장 ' +
+              it.every +
+              '일마다' +
+              (overdue ? ' · 지금 할 때' : '')
+          }
+          var d2 = document.createElement('div')
+          d2.className = 'd'
+          d2.style.fontSize = '12px'
+          d2.style.color = 'var(--ink-soft)'
+          d2.textContent = it.d
+          txt.appendChild(t)
+          txt.appendChild(since)
+          txt.appendChild(d2)
+
+          var btn = document.createElement('button')
+          btn.className = 'donebtn'
+          btn.textContent = '완료'
+          btn.addEventListener('click', function () {
+            state.periodic[it.id] = ymd(today)
+            save()
+            renderPeriodic()
+          })
+
+          li.appendChild(txt)
+          li.appendChild(btn)
+          ul.appendChild(li)
+        })
+      }
+
+      function renderTips() {
+        var box = document.getElementById('tips')
+        TIPS.forEach(function (tip, i) {
+          var det = document.createElement('details')
+          det.className = 'tip'
+          if (i === 0) det.open = true
+          var sum = document.createElement('summary')
+          sum.textContent = tip.t
+          var body = document.createElement('div')
+          body.className = 'body'
+          tip.b.forEach(function (line) {
+            var p = document.createElement('p')
+            p.innerHTML = line
+            body.appendChild(p)
+          })
+          det.appendChild(sum)
+          det.appendChild(body)
+          box.appendChild(det)
+        })
+      }
+
+      document.getElementById('prev').addEventListener('click', function () {
+        cursor.setDate(cursor.getDate() - 1)
+        renderDate()
+        renderDaily()
+      })
+      document.getElementById('next').addEventListener('click', function () {
+        if (daysBetween(ymd(today), ymd(cursor)) >= 0) return
+        cursor.setDate(cursor.getDate() + 1)
+        renderDate()
+        renderDaily()
+      })
+      document.getElementById('reset').addEventListener('click', function () {
+        if (!confirm('저장된 케어 기록을 모두 지울까요?')) return
+        state = { daily: {}, periodic: {} }
+        save()
+        renderDaily()
+        renderPeriodic()
+      })
+
+      renderDate()
+      renderDaily()
+      renderPeriodic()
+      renderTips()
+    </script>
+  </body>
+</html>
